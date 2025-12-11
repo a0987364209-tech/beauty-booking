@@ -2,9 +2,10 @@
   "name": "beauty-booking",
   "main": "expo-router/entry",
   "version": "1.0.0",
-  "scripts": {
+ "scripts": {
     "start": "expo start",
     "web": "expo start --web",
+    "build": "expo export -p web", 
     "lint": "expo lint"
   },
   "dependencies": {
