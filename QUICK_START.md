@@ -63,3 +63,4 @@ LINE_ACCESS_TOKEN=你的_access_token
 3. 確認 Root Directory 是否設定為 `Beauty-booking`
 4. 查看 `VERCEL_DEPLOYMENT.md` 中的常見問題
 
+
