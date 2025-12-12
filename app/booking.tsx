@@ -41,18 +41,26 @@ export default function BookingScreen() {
   // 生成未來 14 天的日期
   const dates = Array.from({ length: 14 }, (_, i) => addDays(new Date(), i));
 
-  // 初始化 LINE LIFF（僅在 Web 環境）
+  // 初始化 LINE LIFF（僅在 Web 環境，可選功能）
+  // 即使初始化失敗，預約功能仍可正常使用
   useEffect(() => {
     if (Platform.OS === 'web') {
       lineLiff.init().then((success) => {
-        if (success) {
+        if (success && lineLiff.isInLine()) {
+          // 只在 LINE 環境中嘗試取得 User ID
           lineLiff.getUserId().then((userId) => {
             if (userId) {
               setLineUserId(userId);
-              console.log('✅ LINE User ID:', userId);
+              console.log('✅ LINE 通知功能已啟用');
             }
+            // 如果沒有 User ID，不顯示警告（這是正常情況）
+          }).catch(() => {
+            // 取得 User ID 失敗，不影響應用運行
           });
         }
+        // 如果不在 LINE 環境中，不顯示任何訊息（這是正常情況）
+      }).catch(() => {
+        // LIFF 初始化失敗，不影響應用運行
       });
     }
   }, []);
@@ -259,7 +267,8 @@ export default function BookingScreen() {
         throw error;
       }
 
-      // 發送 LINE 推播通知（如果有 LINE User ID）
+      // 發送 LINE 推播通知（可選功能，不影響預約流程）
+      // 只有在 LINE 環境中且有 User ID 時才發送
       if (Platform.OS === 'web' && lineUserId) {
         try {
           const notificationSent = await lineLiff.sendNotification(
@@ -273,11 +282,17 @@ export default function BookingScreen() {
           if (notificationSent) {
             console.log('✅ LINE 推播通知已發送');
           } else {
-            console.warn('⚠️ LINE 推播通知發送失敗');
+            console.warn('⚠️ LINE 推播通知發送失敗（不影響預約）');
           }
         } catch (notificationError) {
-          console.error('推播通知錯誤:', notificationError);
-          // 不影響預約流程，只記錄錯誤
+          // 通知失敗不影響預約流程，只記錄錯誤
+          console.warn('⚠️ 推播通知錯誤（預約仍成功）:', notificationError);
+        }
+      } else {
+        // 不在 LINE 環境中或沒有 User ID，這是正常情況
+        // 預約功能仍然正常運作
+        if (Platform.OS === 'web') {
+          console.log('ℹ️ 未發送 LINE 通知（不在 LINE 環境中，這是正常的）');
         }
       }
 

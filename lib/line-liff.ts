@@ -92,8 +92,8 @@ class LineLiffService {
       }
 
       if (!liff.isLoggedIn()) {
-        // 如果未登入，先登入（僅在 LINE 環境中）
-        liff.login();
+        // 如果未登入，不強制登入，靜默返回 null
+        // 這樣可以確保預約功能不依賴 LINE 登入
         return null;
       }
 
