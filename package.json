@@ -12,6 +12,7 @@
     "@expo/vector-icons": "^15.0.3",
     "@react-navigation/native": "^7.1.8",
     "@supabase/supabase-js": "^2.86.0",
+    "@line/liff": "^2.25.0",
     "date-fns": "^4.1.0",
     "expo": "~54.0.27",
     "expo-constants": "~18.0.10",
@@ -39,6 +40,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
+    "@vercel/node": "^3.0.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
     "typescript": "~5.9.2"

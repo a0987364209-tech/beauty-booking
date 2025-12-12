@@ -1,11 +1,13 @@
 import Colors from '@/constants/Colors';
 import { supabase } from '@/lib/supabase';
+import { lineLiff } from '@/lib/line-liff';
 import { Appointment, Customer, Service } from '@/types/database';
 import { Ionicons } from '@expo/vector-icons';
 import { addDays, addMinutes, format, isAfter, isBefore, isSameDay, setHours, setMinutes } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import {
     ScrollView,
     StyleSheet,
@@ -34,9 +36,26 @@ export default function BookingScreen() {
   const [customerAppointments, setCustomerAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [lineUserId, setLineUserId] = useState<string | null>(null);
 
   // 生成未來 14 天的日期
   const dates = Array.from({ length: 14 }, (_, i) => addDays(new Date(), i));
+
+  // 初始化 LINE LIFF（僅在 Web 環境）
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      lineLiff.init().then((success) => {
+        if (success) {
+          lineLiff.getUserId().then((userId) => {
+            if (userId) {
+              setLineUserId(userId);
+              console.log('✅ LINE User ID:', userId);
+            }
+          });
+        }
+      });
+    }
+  }, []);
 
   // 載入課程
   useEffect(() => {
@@ -240,8 +259,30 @@ export default function BookingScreen() {
         throw error;
       }
 
-      // 預約完成後跳回主頁
-      router.replace('/');
+      // 發送 LINE 推播通知（如果有 LINE User ID）
+      if (Platform.OS === 'web' && lineUserId) {
+        try {
+          const notificationSent = await lineLiff.sendNotification(
+            lineUserId,
+            format(selectedDate, 'yyyy-MM-dd'),
+            startTime,
+            selectedService.name,
+            customer?.name || undefined
+          );
+          
+          if (notificationSent) {
+            console.log('✅ LINE 推播通知已發送');
+          } else {
+            console.warn('⚠️ LINE 推播通知發送失敗');
+          }
+        } catch (notificationError) {
+          console.error('推播通知錯誤:', notificationError);
+          // 不影響預約流程，只記錄錯誤
+        }
+      }
+
+      // 預約成功，顯示成功畫面
+      setStep('success');
     } catch (error) {
       console.error('預約失敗:', error);
       setErrorMessage('預約失敗，請稍後再試');
