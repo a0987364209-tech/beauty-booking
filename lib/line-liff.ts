@@ -50,7 +50,7 @@ class LineLiffService {
     }
 
     if (!this.liffId) {
-      console.warn('LIFF App ID not configured');
+      console.warn('LIFF App ID not configured - LINE features will be disabled');
       return false;
     }
 
@@ -60,7 +60,9 @@ class LineLiffService {
       console.log('✅ LIFF initialized successfully');
       return true;
     } catch (error) {
-      console.error('❌ LIFF initialization failed:', error);
+      // LIFF 初始化失敗不應該阻止應用正常運行
+      // 這通常發生在非 LINE 環境中（一般瀏覽器）
+      console.warn('⚠️ LIFF initialization failed (this is normal in non-LINE browsers):', error);
       return false;
     }
   }
@@ -83,8 +85,14 @@ class LineLiffService {
     }
 
     try {
+      // 檢查是否在 LINE 環境中
+      if (!this.isInLine()) {
+        // 不在 LINE 環境中，返回 null（不阻止正常使用）
+        return null;
+      }
+
       if (!liff.isLoggedIn()) {
-        // 如果未登入，先登入
+        // 如果未登入，先登入（僅在 LINE 環境中）
         liff.login();
         return null;
       }
@@ -98,6 +106,7 @@ class LineLiffService {
       };
     } catch (error) {
       console.error('Error getting LINE profile:', error);
+      // 發生錯誤時返回 null，不阻止正常使用
       return null;
     }
   }
@@ -172,8 +181,11 @@ class LineLiffService {
 // 建立單例
 export const lineLiff = new LineLiffService();
 
-// 在 Web 環境自動初始化
+// 在 Web 環境自動初始化（不阻塞應用載入）
 if (typeof window !== 'undefined') {
-  lineLiff.init().catch(console.error);
+  lineLiff.init().catch((error) => {
+    // 靜默處理錯誤，不阻止應用正常運行
+    console.warn('LINE LIFF auto-init failed (this is normal in non-LINE browsers):', error);
+  });
 }
 
