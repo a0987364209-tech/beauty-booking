@@ -37,12 +37,6 @@ export default function BookingScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [lineUserId, setLineUserId] = useState<string | null>(null);
-  const [notificationStatus, setNotificationStatus] = useState<{
-    attempted: boolean;
-    success: boolean;
-    error?: string;
-    details?: string;
-  } | null>(null);
 
   // 生成未來 14 天的日期
   const dates = Array.from({ length: 14 }, (_, i) => addDays(new Date(), i));
@@ -274,77 +268,19 @@ export default function BookingScreen() {
       }
 
       // 發送 LINE 推播通知（可選功能，不影響預約流程）
-      // 只有在 LINE 環境中且有 User ID 時才發送
-      const isInLineEnv = Platform.OS === 'web' && lineLiff.isInLine();
-      const hasLineUserId = !!lineUserId;
-      
-      setNotificationStatus({
-        attempted: true,
-        success: false,
-        details: `環境檢查: Platform=${Platform.OS}, 在LINE環境=${isInLineEnv}, 有UserID=${hasLineUserId}`
-      });
-      
       if (Platform.OS === 'web' && lineUserId) {
         try {
-          console.log('🔍 準備發送通知:', {
-            userId: lineUserId,
-            date: format(selectedDate, 'yyyy-MM-dd'),
-            time: startTime,
-            service: selectedService.name
-          });
-          
-          const notificationSent = await lineLiff.sendNotification(
+          await lineLiff.sendNotification(
             lineUserId,
             format(selectedDate, 'yyyy-MM-dd'),
             startTime,
             selectedService.name,
             customer?.name || undefined
           );
-          
-          if (notificationSent) {
-            console.log('✅ LINE 推播通知已發送');
-            setNotificationStatus({
-              attempted: true,
-              success: true,
-              details: '通知已成功發送到 LINE API'
-            });
-          } else {
-            console.warn('⚠️ LINE 推播通知發送失敗（不影響預約）');
-            setNotificationStatus({
-              attempted: true,
-              success: false,
-              error: 'API 返回失敗',
-              details: '請檢查 Vercel Logs 中的 API 錯誤訊息'
-            });
-          }
-        } catch (notificationError: any) {
+        } catch (notificationError) {
           // 通知失敗不影響預約流程，只記錄錯誤
-          console.error('⚠️ 推播通知錯誤（預約仍成功）:', notificationError);
-          setNotificationStatus({
-            attempted: true,
-            success: false,
-            error: notificationError?.message || '未知錯誤',
-            details: '請檢查瀏覽器 Console 和 Vercel Logs'
-          });
+          console.warn('推播通知錯誤（預約仍成功）:', notificationError);
         }
-      } else {
-        // 不在 LINE 環境中或沒有 User ID，這是正常情況
-        let reason = '';
-        if (Platform.OS !== 'web') {
-          reason = '不在 Web 環境中';
-        } else if (!isInLineEnv) {
-          reason = '不在 LINE 內建瀏覽器中';
-        } else if (!hasLineUserId) {
-          reason = '無法取得 LINE User ID（可能未登入 LINE）';
-        }
-        
-        console.log('ℹ️ 未發送 LINE 通知:', reason);
-        setNotificationStatus({
-          attempted: true,
-          success: false,
-          error: reason,
-          details: '這是正常情況，預約功能不受影響'
-        });
       }
 
       // 預約成功，顯示成功畫面
@@ -389,49 +325,6 @@ export default function BookingScreen() {
               </View>
             </View>
             
-            {/* LINE 通知調試資訊 */}
-            {notificationStatus && (
-              <View style={styles.debugContainer}>
-                <View style={styles.debugHeader}>
-                  <Ionicons 
-                    name={notificationStatus.success ? "checkmark-circle" : "information-circle"} 
-                    size={20} 
-                    color={notificationStatus.success ? Colors.success : Colors.warning} 
-                  />
-                  <Text style={styles.debugTitle}>
-                    LINE 通知狀態
-                  </Text>
-                </View>
-                <View style={styles.debugContent}>
-                  <Text style={styles.debugText}>
-                    <Text style={styles.debugLabel}>狀態：</Text>
-                    {notificationStatus.success ? '✅ 已發送' : '⚠️ 未發送'}
-                  </Text>
-                  {notificationStatus.error && (
-                    <Text style={styles.debugText}>
-                      <Text style={styles.debugLabel}>原因：</Text>
-                      {notificationStatus.error}
-                    </Text>
-                  )}
-                  {notificationStatus.details && (
-                    <Text style={[styles.debugText, styles.debugDetails]}>
-                      <Text style={styles.debugLabel}>詳情：</Text>
-                      {notificationStatus.details}
-                    </Text>
-                  )}
-                  {lineUserId && (
-                    <Text style={[styles.debugText, styles.debugDetails]}>
-                      <Text style={styles.debugLabel}>LINE User ID：</Text>
-                      {lineUserId.substring(0, 20)}...
-                    </Text>
-                  )}
-                  <Text style={[styles.debugText, styles.debugHint]}>
-                    💡 提示：如果通知未發送，請檢查是否在 LINE 內建瀏覽器中打開，並確認已登入 LINE
-                  </Text>
-                </View>
-              </View>
-            )}
-            
             <TouchableOpacity
               style={styles.button}
               onPress={() => {
@@ -441,7 +334,6 @@ export default function BookingScreen() {
                 setSelectedService(null);
                 setSelectedTime(null);
                 setErrorMessage('');
-                setNotificationStatus(null);
               }}
             >
               <Text style={styles.buttonText}>繼續預約</Text>
@@ -1102,48 +994,5 @@ const styles = StyleSheet.create({
   existingAppointmentText: {
     fontSize: 13,
     color: Colors.text,
-  },
-  debugContainer: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  debugHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  debugTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  debugContent: {
-    gap: 8,
-  },
-  debugText: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    lineHeight: 20,
-  },
-  debugLabel: {
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  debugDetails: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontFamily: 'monospace',
-  },
-  debugHint: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontStyle: 'italic',
-    marginTop: 8,
   },
 });
