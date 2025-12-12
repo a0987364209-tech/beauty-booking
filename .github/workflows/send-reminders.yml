@@ -1,0 +1,28 @@
+name: 發送預約提醒
+
+# 設定觸發條件
+on:
+  schedule:
+    # 每天台灣時間中午 12:00 執行（UTC+8，所以是 UTC 04:00）
+    - cron: '0 4 * * *'
+  
+  # 也可以手動觸發（在 GitHub 網頁上點擊執行）
+  workflow_dispatch:
+
+jobs:
+  send-reminders:
+    runs-on: ubuntu-latest  # 使用 Ubuntu 系統
+    
+    steps:
+      # 步驟 1：呼叫提醒發送 API
+      - name: 發送預約提醒通知
+        run: |
+          curl -X POST https://beauty-booking-gamma.vercel.app/api/send-reminders \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.REMINDER_API_SECRET }}"
+        
+      # 步驟 2：顯示執行結果
+      - name: 顯示執行結果
+        run: |
+          echo "提醒通知已發送完成"
+

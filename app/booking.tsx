@@ -253,23 +253,30 @@ export default function BookingScreen() {
       const endDateTime = addMinutes(appointmentDateTime, totalDuration);
       const endTime = format(endDateTime, 'HH:mm');
 
-      const { error } = await supabase.from('appointments').insert({
-        customer_phone: (customer as any).phone,
-        service_id: selectedService.id,
-        appointment_date: format(selectedDate, 'yyyy-MM-dd'),
-        start_time: startTime,
-        end_time: endTime,
-        status: 'pending',
-      } as any);
+      const { data: appointmentData, error } = await supabase
+        .from('appointments')
+        .insert({
+          customer_phone: (customer as any).phone,
+          service_id: selectedService.id,
+          appointment_date: format(selectedDate, 'yyyy-MM-dd'),
+          start_time: startTime,
+          end_time: endTime,
+          status: 'pending',
+        } as any)
+        .select()
+        .single();
 
       if (error) {
         console.error('預約錯誤:', error);
         throw error;
       }
 
+      const appointmentId = appointmentData?.id;
+
       // 發送 LINE 推播通知（可選功能，不影響預約流程）
       if (Platform.OS === 'web' && lineUserId) {
         try {
+          // 1. 發送立即通知
           await lineLiff.sendNotification(
             lineUserId,
             format(selectedDate, 'yyyy-MM-dd'),
@@ -277,6 +284,41 @@ export default function BookingScreen() {
             selectedService.name,
             customer?.name || undefined
           );
+
+          // 2. 建立提醒任務（預約前一天中午 12:00 發送）
+          if (appointmentId) {
+            const reminderDate = addDays(selectedDate, -1); // 預約前一天
+            const reminderDateStr = format(reminderDate, 'yyyy-MM-dd');
+            const scheduledDateStr = format(selectedDate, 'yyyy-MM-dd');
+
+            // 檢查提醒日期是否為過去（如果預約是今天或明天，提醒日期可能是今天或過去）
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const reminderDateObj = new Date(reminderDate);
+            reminderDateObj.setHours(0, 0, 0, 0);
+
+            // 只有當提醒日期是未來時才建立提醒任務
+            if (reminderDateObj >= today) {
+              const { error: reminderError } = await supabase
+                .from('reminder_tasks')
+                .insert({
+                  appointment_id: appointmentId,
+                  line_user_id: lineUserId,
+                  scheduled_date: scheduledDateStr,
+                  scheduled_time: startTime,
+                  reminder_date: reminderDateStr,
+                  reminder_time: '12:00:00',
+                  service_name: selectedService.name,
+                  customer_name: customer?.name || null,
+                  message_content: `提醒：您明天 ${startTime} 有預約「${selectedService.name}」，請準時到達！`,
+                  sent: false,
+                } as any);
+
+              if (reminderError) {
+                console.warn('建立提醒任務失敗（預約仍成功）:', reminderError);
+              }
+            }
+          }
         } catch (notificationError) {
           // 通知失敗不影響預約流程，只記錄錯誤
           console.warn('推播通知錯誤（預約仍成功）:', notificationError);
