@@ -81,6 +81,7 @@ export interface Database {
           name: string;
           specification: string | null;
           price: number;
+          experience_price: number | null;
           cost: number | null;
           category: 'course' | 'product' | 'addon';
           duration_minutes: number | null;
@@ -95,6 +96,7 @@ export interface Database {
           name: string;
           specification?: string | null;
           price: number;
+          experience_price?: number | null;
           cost?: number | null;
           category: 'course' | 'product' | 'addon';
           duration_minutes?: number | null;
@@ -109,6 +111,7 @@ export interface Database {
           name?: string;
           specification?: string | null;
           price?: number;
+          experience_price?: number | null;
           cost?: number | null;
           category?: 'course' | 'product' | 'addon';
           duration_minutes?: number | null;

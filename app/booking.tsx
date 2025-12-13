@@ -73,15 +73,10 @@ export default function BookingScreen() {
         .select('*')
         .eq('category', 'course')
         .eq('is_active', true)
-        .order('price', { ascending: true }); // 按價格由小到大排序
+        .order('sort_order', { ascending: true }); // 按 sort_order 排序
       
       if (data) {
-        // 將 "靓白新生" 改名為 "鑽白新生"
-        const updatedData = (data as any).map((course: any) => ({
-          ...course,
-          name: course.name === '靓白新生' ? '鑽白新生' : course.name
-        }));
-        setCourses(updatedData);
+        setCourses(data as any);
       }
     };
     loadCourses();
@@ -487,11 +482,29 @@ export default function BookingScreen() {
                   <View style={styles.serviceInfo}>
                     <Text style={styles.serviceName}>{course.name}</Text>
                   </View>
-                  <Text style={styles.servicePrice}>
-                    NT${course.price.toLocaleString()}
-                  </Text>
+                  <View style={styles.priceContainer}>
+                    {course.experience_price ? (
+                      <>
+                        <Text style={styles.originalPrice}>
+                          NT${course.price.toLocaleString()}
+                        </Text>
+                        <Text style={styles.experiencePrice}>
+                          NT${course.experience_price.toLocaleString()}
+                        </Text>
+                      </>
+                    ) : (
+                      <Text style={styles.servicePrice}>
+                        NT${course.price.toLocaleString()}
+                      </Text>
+                    )}
+                  </View>
                   {selectedService?.id === course.id && (
-                    <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />
+                    <Ionicons 
+                      name="checkmark-circle" 
+                      size={24} 
+                      color={Colors.primary}
+                      style={styles.checkIcon}
+                    />
                   )}
                 </TouchableOpacity>
               ))}
@@ -842,12 +855,14 @@ const styles = StyleSheet.create({
   serviceItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    justifyContent: 'space-between',
+    padding: 14,
     backgroundColor: Colors.background,
     borderRadius: 10,
     marginBottom: 8,
     borderWidth: 2,
     borderColor: 'transparent',
+    minHeight: 60,
   },
   serviceItemSelected: {
     borderColor: Colors.primary,
@@ -855,22 +870,48 @@ const styles = StyleSheet.create({
   },
   serviceInfo: {
     flex: 1,
+    marginRight: 12,
+    minWidth: 0, // 允許文字換行
   },
   serviceName: {
     fontSize: 16,
     fontWeight: '600',
     color: Colors.text,
+    flexWrap: 'wrap',
   },
   serviceDuration: {
     fontSize: 13,
     color: Colors.textSecondary,
     marginTop: 2,
   },
+  priceContainer: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    minWidth: 80, // 確保價格區域有足夠空間
+  },
   servicePrice: {
     fontSize: 16,
     fontWeight: '700',
     color: Colors.primary,
-    marginRight: 8,
+    textAlign: 'right',
+  },
+  originalPrice: {
+    fontSize: 11,
+    fontWeight: '400',
+    color: Colors.textSecondary,
+    textDecorationLine: 'line-through',
+    marginBottom: 2,
+    textAlign: 'right',
+  },
+  experiencePrice: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#dc3545', // 紅色
+    textAlign: 'right',
+    lineHeight: 22,
+  },
+  checkIcon: {
+    marginLeft: 8,
   },
   sectionLabel: {
     fontSize: 14,
