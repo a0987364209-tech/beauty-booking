@@ -20,7 +20,12 @@ export default async function handler(
     return res.status(200).end();
   }
 
-  // 只允許 POST 請求
+  // 處理 GET 請求（LINE Webhook 驗證）
+  if (req.method === 'GET') {
+    return res.status(200).json({ message: 'Webhook is active' });
+  }
+
+  // 只允許 POST 請求（接收 Webhook 事件）
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
