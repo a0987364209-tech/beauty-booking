@@ -165,7 +165,7 @@ export default function BookingScreen() {
       .from('appointments')
       .select('*, service:services(*)')
       .eq('appointment_date', dateStr)
-      .in('status', ['pending', 'confirmed']);
+      .in('status', ['pending', 'confirmed', 'cancelled']);
 
     setExistingAppointments(data || []);
   }, []);
@@ -207,7 +207,13 @@ export default function BookingScreen() {
 
       // 檢查是否與現有預約衝突
       // 需要考慮每個預約的工時+緩衝時間
+      // 已取消的預約不佔用時段，可以重新預約
       const hasConflict = (existingAppointments as any).some((apt: any) => {
+        // 已取消的預約不佔用時段
+        if (apt.status === 'cancelled') {
+          return false;
+        }
+        
         const aptService = apt.service as any;
         const aptServiceDuration = aptService?.duration_minutes || 60;
         const aptTotalDuration = aptServiceDuration + BUFFER_MINUTES;
@@ -279,6 +285,7 @@ export default function BookingScreen() {
           // 1. 發送立即通知
           await lineLiff.sendNotification(
             lineUserId,
+            appointmentId,
             format(selectedDate, 'yyyy-MM-dd'),
             startTime,
             selectedService.name,
@@ -438,15 +445,32 @@ export default function BookingScreen() {
             {customerAppointments.length > 0 && (
               <View style={styles.existingAppointments}>
                 <Text style={styles.existingAppointmentsTitle}>您目前的預約：</Text>
-                {(customerAppointments as any[]).map((apt: any, index: number) => (
-                  <View key={index} style={styles.existingAppointmentItem}>
-                    <Ionicons name="calendar" size={16} color={Colors.primary} />
-                    <Text style={styles.existingAppointmentText}>
-                      {format(new Date(apt.appointment_date), 'yyyy年M月d日', { locale: zhTW })} {apt.start_time}
-                      {apt.service && ` - ${(apt.service as any).name}`}
-                    </Text>
-                  </View>
-                ))}
+                {(customerAppointments as any[]).map((apt: any, index: number) => {
+                  const getStatusLabel = () => {
+                    if (apt.status === 'confirmed') return '確認';
+                    if (apt.status === 'cancelled') return '已取消';
+                    return '待確認';
+                  };
+                  
+                  const getStatusStyle = () => {
+                    if (apt.status === 'confirmed') return { color: Colors.success };
+                    if (apt.status === 'cancelled') return { color: Colors.textLight };
+                    return { color: Colors.text };
+                  };
+                  
+                  return (
+                    <View key={index} style={styles.existingAppointmentItem}>
+                      <Ionicons name="calendar" size={16} color={Colors.primary} />
+                      <Text style={styles.existingAppointmentText}>
+                        {format(new Date(apt.appointment_date), 'yyyy年M月d日', { locale: zhTW })} {apt.start_time}
+                        {apt.service && ` - ${(apt.service as any).name}`}
+                      </Text>
+                      <Text style={[styles.statusLabel, getStatusStyle()]}>
+                        {getStatusLabel()}
+                      </Text>
+                    </View>
+                  );
+                })}
               </View>
             )}
             
@@ -1036,5 +1060,11 @@ const styles = StyleSheet.create({
   existingAppointmentText: {
     fontSize: 13,
     color: Colors.text,
+    flex: 1,
+  },
+  statusLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });

@@ -144,6 +144,7 @@ class LineLiffService {
    */
   async sendNotification(
     userId: string,
+    appointmentId: string,
     appointmentDate: string,
     appointmentTime: string,
     serviceName: string,
@@ -157,6 +158,7 @@ class LineLiffService {
         },
         body: JSON.stringify({
           userId,
+          appointmentId,
           appointmentDate,
           appointmentTime,
           serviceName,

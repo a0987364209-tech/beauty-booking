@@ -5,6 +5,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 interface NotificationRequest {
   userId: string; // LINE User ID
+  appointmentId: string; // 預約 ID
   appointmentDate: string;
   appointmentTime: string;
   serviceName: string;
@@ -33,6 +34,7 @@ export default async function handler(
   try {
     const {
       userId,
+      appointmentId,
       appointmentDate,
       appointmentTime,
       serviceName,
@@ -40,10 +42,10 @@ export default async function handler(
     } = req.body as NotificationRequest;
 
     // 驗證必要參數
-    if (!userId || !appointmentDate || !appointmentTime || !serviceName) {
+    if (!userId || !appointmentId || !appointmentDate || !appointmentTime || !serviceName) {
       return res.status(400).json({ 
         error: 'Missing required parameters',
-        required: ['userId', 'appointmentDate', 'appointmentTime', 'serviceName']
+        required: ['userId', 'appointmentId', 'appointmentDate', 'appointmentTime', 'serviceName']
       });
     }
 
@@ -58,10 +60,13 @@ export default async function handler(
     const dateObj = new Date(appointmentDate);
     const formattedDate = `${dateObj.getFullYear()}年${dateObj.getMonth() + 1}月${dateObj.getDate()}日`;
 
-    // 建立推播訊息
+    // 建立推播訊息（使用 Buttons Template）
     const message = {
-      type: 'text',
-      text: `🎉 預約成功通知
+      type: 'template',
+      altText: '預約成功通知',
+      template: {
+        type: 'buttons',
+        text: `🎉 預約成功通知
 
 ${customerName || '親愛的客戶'}，您好！
 
@@ -71,8 +76,15 @@ ${customerName || '親愛的客戶'}，您好！
 ⏰ 時間：${appointmentTime}
 💆 服務：${serviceName}
 
-我們期待為您服務！
-如有任何問題，歡迎隨時聯繫我們。`,
+我們期待為您服務！`,
+        actions: [
+          {
+            type: 'postback',
+            label: '取消預約',
+            data: `action=cancel&appointment_id=${appointmentId}`,
+          },
+        ],
+      },
     };
 
     // 發送推播訊息到 LINE

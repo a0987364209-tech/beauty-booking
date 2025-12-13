@@ -84,15 +84,15 @@ export default async function handler(
 
     for (const reminder of reminders) {
       try {
-        // 檢查預約是否仍然有效（未取消）
+        // 檢查預約是否仍然有效（只發送給 pending 狀態的預約）
         const { data: appointment } = await supabase
           .from('appointments')
           .select('status')
           .eq('id', reminder.appointment_id)
           .single();
 
-        // 如果預約已取消，標記提醒為已發送（跳過）
-        if (!appointment || appointment.status === 'cancelled') {
+        // 如果預約已取消或已確認，標記提醒為已發送（跳過）
+        if (!appointment || appointment.status !== 'pending') {
           await supabase
             .from('reminder_tasks')
             .update({ sent: true, sent_at: new Date().toISOString() })
@@ -100,20 +100,36 @@ export default async function handler(
           continue;
         }
 
-        // 建立提醒訊息
-        const message = {
-          type: 'text',
-          text: `🔔 預約提醒
+        // 格式化日期（轉換為中文格式）
+        const dateObj = new Date(reminder.scheduled_date);
+        const formattedDate = `${dateObj.getFullYear()}年${dateObj.getMonth() + 1}月${dateObj.getDate()}日`;
 
-${reminder.customer_name || '親愛的客戶'}，您好！
+        // 建立提醒訊息（使用 Buttons Template）
+        const message = {
+          type: 'template',
+          altText: '預約提醒',
+          template: {
+            type: 'buttons',
+            text: `🔔 預約提醒
 
 提醒您：明天 ${reminder.scheduled_time} 有預約「${reminder.service_name}」
 
-📅 日期：${reminder.scheduled_date}
+📅 日期：${formattedDate}
 ⏰ 時間：${reminder.scheduled_time}
-💆 服務：${reminder.service_name}
-
-請準時到達，我們期待為您服務！`,
+💆 服務：${reminder.service_name}`,
+            actions: [
+              {
+                type: 'postback',
+                label: '確認預約',
+                data: `action=confirm&appointment_id=${reminder.appointment_id}`,
+              },
+              {
+                type: 'postback',
+                label: '取消預約',
+                data: `action=cancel&appointment_id=${reminder.appointment_id}`,
+              },
+            ],
+          },
         };
 
         // 發送推播訊息到 LINE
