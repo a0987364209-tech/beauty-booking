@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { lineLiff } from '@/lib/line-liff';
 import { Appointment, Customer, Service } from '@/types/database';
 import { Ionicons } from '@expo/vector-icons';
-import { addDays, addMinutes, format, isAfter, isBefore, isSameDay, setHours, setMinutes } from 'date-fns';
+import { addDays, addMinutes, addMonths, format, getDaysInMonth, isAfter, isBefore, isSameDay, setHours, setMinutes, startOfMonth, endOfMonth } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -37,9 +37,37 @@ export default function BookingScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [lineUserId, setLineUserId] = useState<string | null>(null);
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
 
-  // 生成未來 14 天的日期
-  const dates = Array.from({ length: 14 }, (_, i) => addDays(new Date(), i));
+  // 生成當前月份的所有日期
+  const getDatesForMonth = (month: Date) => {
+    const start = startOfMonth(month);
+    const end = endOfMonth(month);
+    const daysInMonth = getDaysInMonth(month);
+    const today = new Date();
+    const dates: Date[] = [];
+    
+    // 只包含今天及之後的日期
+    for (let i = 0; i < daysInMonth; i++) {
+      const date = addDays(start, i);
+      if (isSameDay(date, today) || isAfter(date, today)) {
+        dates.push(date);
+      }
+    }
+    
+    return dates;
+  };
+
+  const dates = getDatesForMonth(currentMonth);
+  
+  // 生成未來幾個月的月份列表（最多6個月）
+  const availableMonths = Array.from({ length: 6 }, (_, i) => {
+    const month = addMonths(new Date(), i);
+    return {
+      date: month,
+      label: format(month, 'yyyy年M月', { locale: zhTW }),
+    };
+  });
 
   // 初始化 LINE LIFF（僅在 Web 環境，可選功能）
   // 即使初始化失敗，預約功能仍可正常使用
@@ -483,20 +511,9 @@ export default function BookingScreen() {
                     <Text style={styles.serviceName}>{course.name}</Text>
                   </View>
                   <View style={styles.priceContainer}>
-                    {course.experience_price ? (
-                      <>
-                        <Text style={styles.originalPrice}>
-                          NT${course.price.toLocaleString()}
-                        </Text>
-                        <Text style={styles.experiencePrice}>
-                          NT${course.experience_price.toLocaleString()}
-                        </Text>
-                      </>
-                    ) : (
-                      <Text style={styles.servicePrice}>
-                        NT${course.price.toLocaleString()}
-                      </Text>
-                    )}
+                    <Text style={styles.servicePrice}>
+                      NT${course.price.toLocaleString()}
+                    </Text>
                   </View>
                   {selectedService?.id === course.id && (
                     <Ionicons 
@@ -510,13 +527,158 @@ export default function BookingScreen() {
               ))}
             </View>
 
-            <TouchableOpacity
-              style={[styles.button, !selectedService && styles.buttonDisabled]}
-              onPress={() => setStep('datetime')}
-              disabled={!selectedService}
-            >
-              <Text style={styles.buttonText}>選擇時間</Text>
-            </TouchableOpacity>
+            {/* 選中課程後，直接顯示日期和時間選擇 */}
+            {selectedService && (
+              <>
+                {/* 月份切換器 */}
+                <View style={styles.monthSelector}>
+                  <TouchableOpacity
+                    style={styles.monthButton}
+                    onPress={() => {
+                      const prevMonth = addMonths(currentMonth, -1);
+                      const today = startOfMonth(new Date());
+                      const prevMonthStart = startOfMonth(prevMonth);
+                      // 允許切換到當月或未來月份
+                      if (isAfter(prevMonthStart, today) || isSameDay(prevMonthStart, today)) {
+                        setCurrentMonth(prevMonthStart);
+                        // 如果切換到當月，選擇今天；否則選擇該月第一天
+                        const newDate = isSameDay(prevMonthStart, today) ? new Date() : prevMonthStart;
+                        setSelectedDate(newDate);
+                        setSelectedTime(null);
+                      }
+                    }}
+                    disabled={isSameDay(startOfMonth(currentMonth), startOfMonth(new Date()))}
+                  >
+                    <Ionicons 
+                      name="chevron-back" 
+                      size={20} 
+                      color={isSameDay(startOfMonth(currentMonth), startOfMonth(new Date())) ? Colors.textLight : Colors.primary} 
+                    />
+                  </TouchableOpacity>
+                  <Text style={styles.monthLabel}>
+                    {format(currentMonth, 'yyyy年M月', { locale: zhTW })}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.monthButton}
+                    onPress={() => {
+                      const nextMonth = addMonths(currentMonth, 1);
+                      const maxMonth = addMonths(new Date(), 5); // 最多6個月
+                      const nextMonthStart = startOfMonth(nextMonth);
+                      const maxMonthStart = startOfMonth(maxMonth);
+                      // 允許切換到未來6個月內
+                      if (isBefore(nextMonthStart, maxMonthStart) || isSameDay(nextMonthStart, maxMonthStart)) {
+                        setCurrentMonth(nextMonthStart);
+                        setSelectedDate(nextMonthStart);
+                        setSelectedTime(null);
+                      }
+                    }}
+                    disabled={isSameDay(startOfMonth(currentMonth), startOfMonth(addMonths(new Date(), 5)))}
+                  >
+                    <Ionicons 
+                      name="chevron-forward" 
+                      size={20} 
+                      color={isSameDay(startOfMonth(currentMonth), startOfMonth(addMonths(new Date(), 5))) ? Colors.textLight : Colors.primary} 
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                {/* 日期選擇 */}
+                <Text style={styles.sectionLabel}>選擇日期</Text>
+                <View style={styles.dateGrid}>
+                  {dates.map((date, index) => {
+                    const isSelected = isSameDay(date, selectedDate);
+                    const isToday = isSameDay(date, new Date());
+                    
+                    return (
+                      <TouchableOpacity
+                        key={`date-${index}`}
+                        style={[
+                          styles.dateItem,
+                          isSelected && styles.dateItemSelected,
+                        ]}
+                        onPress={() => {
+                          setSelectedDate(date);
+                          setSelectedTime(null);
+                        }}
+                      >
+                        <Text style={[styles.dateWeekday, isSelected && styles.dateTextSelected]}>
+                          {isToday ? '今天' : format(date, 'EEE', { locale: zhTW })}
+                        </Text>
+                        <Text style={[styles.dateDay, isSelected && styles.dateTextSelected]}>
+                          {format(date, 'd')}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* 時段選擇 */}
+                <Text style={styles.sectionLabel}>選擇時段</Text>
+                {availableSlots.length > 0 ? (
+                  <View style={styles.timeGrid}>
+                    {availableSlots.map((time, index) => (
+                      <TouchableOpacity
+                        key={`time-${index}`}
+                        style={[
+                          styles.timeItem,
+                          selectedTime === time && styles.timeItemSelected,
+                        ]}
+                        onPress={() => setSelectedTime(time)}
+                      >
+                        <Text style={[
+                          styles.timeText,
+                          selectedTime === time && styles.timeTextSelected,
+                        ]}>
+                          {time}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.noSlots}>
+                    <Ionicons name="calendar-outline" size={32} color={Colors.textLight} />
+                    <Text style={styles.noSlotsText}>此日期暫無可預約時段</Text>
+                  </View>
+                )}
+
+                {/* 選擇時間後，直接顯示確認資訊 */}
+                {selectedTime && (
+                  <View style={styles.confirmSectionInline}>
+                    <Text style={styles.confirmTitleInline}>確認預約資訊</Text>
+                    <View style={styles.confirmRowInline}>
+                      <Text style={styles.confirmLabelInline}>課程</Text>
+                      <Text style={styles.confirmValueInline}>{selectedService.name}</Text>
+                    </View>
+                    <View style={styles.confirmRowInline}>
+                      <Text style={styles.confirmLabelInline}>日期</Text>
+                      <Text style={styles.confirmValueInline}>
+                        {format(selectedDate, 'yyyy年M月d日 EEEE', { locale: zhTW })}
+                      </Text>
+                    </View>
+                    <View style={styles.confirmRowInline}>
+                      <Text style={styles.confirmLabelInline}>時間</Text>
+                      <Text style={styles.confirmValueInline}>{selectedTime}</Text>
+                    </View>
+                    <View style={styles.confirmRowInline}>
+                      <Text style={styles.confirmLabelInline}>費用</Text>
+                      <Text style={styles.confirmValueInline}>
+                        NT${selectedService.price.toLocaleString()}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.button, styles.confirmButton, isLoading && styles.buttonDisabled]}
+                      onPress={handleSubmit}
+                      disabled={isLoading}
+                    >
+                      <Ionicons name="checkmark-circle" size={20} color={Colors.textOnPrimary} />
+                      <Text style={styles.buttonText}>
+                        {isLoading ? '預約中...' : '確認預約'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </>
+            )}
           </View>
         );
 
@@ -661,7 +823,7 @@ export default function BookingScreen() {
             <View style={styles.buttonRow}>
               <TouchableOpacity
                 style={styles.backButton}
-                onPress={() => setStep('datetime')}
+                onPress={() => setStep('service')}
               >
                 <Text style={styles.backButtonText}>返回</Text>
               </TouchableOpacity>
@@ -912,6 +1074,58 @@ const styles = StyleSheet.create({
   },
   checkIcon: {
     marginLeft: 8,
+  },
+  monthSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    marginBottom: 16,
+    gap: 16,
+  },
+  monthButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: Colors.background,
+  },
+  monthLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text,
+    minWidth: 100,
+    textAlign: 'center',
+  },
+  confirmSectionInline: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    gap: 12,
+  },
+  confirmTitleInline: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  confirmRowInline: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
+  confirmLabelInline: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
+  confirmValueInline: {
+    fontSize: 14,
+    color: Colors.text,
+    fontWeight: '600',
   },
   sectionLabel: {
     fontSize: 14,
