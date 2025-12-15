@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { addDays, addMinutes, addMonths, format, getDaysInMonth, isAfter, isBefore, isSameDay, setHours, setMinutes, startOfMonth, endOfMonth } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useCallback, useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import {
     ScrollView,
@@ -38,29 +38,6 @@ export default function BookingScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [lineUserId, setLineUserId] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
-  
-  // 用於滾動的 ref
-  const scrollViewRef = useRef<ScrollView>(null);
-  const timeSelectionRef = useRef<View>(null);
-  const confirmButtonRef = useRef<View>(null);
-  
-  // 用於存儲位置
-  const [timeSelectionY, setTimeSelectionY] = useState<number>(0);
-  const [confirmButtonY, setConfirmButtonY] = useState<number>(0);
-  
-  // 滾動到時間選擇區域
-  const scrollToTimeSelection = () => {
-    if (timeSelectionY > 0) {
-      scrollViewRef.current?.scrollTo({ y: timeSelectionY - 20, animated: true });
-    }
-  };
-  
-  // 滾動到確認按鈕
-  const scrollToConfirmButton = () => {
-    if (confirmButtonY > 0) {
-      scrollViewRef.current?.scrollTo({ y: confirmButtonY - 20, animated: true });
-    }
-  };
 
   // 生成當前月份的所有日期
   const getDatesForMonth = (month: Date) => {
@@ -530,10 +507,6 @@ export default function BookingScreen() {
                   ]}
                   onPress={() => {
                     setSelectedService(course);
-                    // 選擇課程後，延遲一下再滾動，確保 UI 已更新
-                    setTimeout(() => {
-                      scrollToTimeSelection();
-                    }, 200);
                   }}
                 >
                   <View style={styles.serviceInfo}>
@@ -544,198 +517,32 @@ export default function BookingScreen() {
                       NT${course.price.toLocaleString()}
                     </Text>
                   </View>
-                  {selectedService?.id === course.id ? (
-                    <TouchableOpacity
-                      style={styles.checkButton}
-                      onPress={() => {
-                        // 點擊打V按鈕，滾動到時間選擇區域
-                        scrollToTimeSelection();
-                      }}
-                    >
-                      <Ionicons 
-                        name="checkmark-circle" 
-                        size={28} 
-                        color={Colors.primary}
-                      />
-                    </TouchableOpacity>
-                  ) : null}
+                  {selectedService?.id === course.id && (
+                    <Ionicons 
+                      name="checkmark-circle" 
+                      size={24} 
+                      color={Colors.primary}
+                      style={styles.checkIcon}
+                    />
+                  )}
                 </TouchableOpacity>
               ))}
             </View>
 
-            {/* 選中課程後，直接顯示日期和時間選擇 */}
-            {selectedService && (
-              <>
-                {/* 月份切換器 */}
-                <View style={styles.monthSelector}>
-                  <TouchableOpacity
-                    style={styles.monthButton}
-                    onPress={() => {
-                      const prevMonth = addMonths(currentMonth, -1);
-                      const today = startOfMonth(new Date());
-                      const prevMonthStart = startOfMonth(prevMonth);
-                      // 允許切換到當月或未來月份
-                      if (isAfter(prevMonthStart, today) || isSameDay(prevMonthStart, today)) {
-                        setCurrentMonth(prevMonthStart);
-                        // 如果切換到當月，選擇今天；否則選擇該月第一天
-                        const newDate = isSameDay(prevMonthStart, today) ? new Date() : prevMonthStart;
-                        setSelectedDate(newDate);
-                        setSelectedTime(null);
-                      }
-                    }}
-                    disabled={isSameDay(startOfMonth(currentMonth), startOfMonth(new Date()))}
-                  >
-                    <Ionicons 
-                      name="chevron-back" 
-                      size={20} 
-                      color={isSameDay(startOfMonth(currentMonth), startOfMonth(new Date())) ? Colors.textLight : Colors.primary} 
-                    />
-                  </TouchableOpacity>
-                  <Text style={styles.monthLabel}>
-                    {format(currentMonth, 'yyyy年M月', { locale: zhTW })}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.monthButton}
-                    onPress={() => {
-                      const nextMonth = addMonths(currentMonth, 1);
-                      const maxMonth = addMonths(new Date(), 5); // 最多6個月
-                      const nextMonthStart = startOfMonth(nextMonth);
-                      const maxMonthStart = startOfMonth(maxMonth);
-                      // 允許切換到未來6個月內
-                      if (isBefore(nextMonthStart, maxMonthStart) || isSameDay(nextMonthStart, maxMonthStart)) {
-                        setCurrentMonth(nextMonthStart);
-                        setSelectedDate(nextMonthStart);
-                        setSelectedTime(null);
-                      }
-                    }}
-                    disabled={isSameDay(startOfMonth(currentMonth), startOfMonth(addMonths(new Date(), 5)))}
-                  >
-                    <Ionicons 
-                      name="chevron-forward" 
-                      size={20} 
-                      color={isSameDay(startOfMonth(currentMonth), startOfMonth(addMonths(new Date(), 5))) ? Colors.textLight : Colors.primary} 
-                    />
-                  </TouchableOpacity>
-                </View>
-
-                {/* 日期選擇 */}
-                <Text style={styles.sectionLabel}>選擇日期</Text>
-                <View style={styles.dateGrid}>
-                  {dates.map((date, index) => {
-                    const isSelected = isSameDay(date, selectedDate);
-                    const isToday = isSameDay(date, new Date());
-                    
-                    return (
-                      <TouchableOpacity
-                        key={`date-${index}`}
-                        style={[
-                          styles.dateItem,
-                          isSelected && styles.dateItemSelected,
-                        ]}
-                        onPress={() => {
-                          setSelectedDate(date);
-                          setSelectedTime(null);
-                        }}
-                      >
-                        <Text style={[styles.dateWeekday, isSelected && styles.dateTextSelected]}>
-                          {isToday ? '今天' : format(date, 'EEE', { locale: zhTW })}
-                        </Text>
-                        <Text style={[styles.dateDay, isSelected && styles.dateTextSelected]}>
-                          {format(date, 'd')}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {/* 時段選擇 */}
-                <View 
-                  ref={timeSelectionRef}
-                  onLayout={(event) => {
-                    const { y } = event.nativeEvent.layout;
-                    setTimeSelectionY(y);
-                  }}
-                >
-                  <Text style={styles.sectionLabel}>選擇時段</Text>
-                  {availableSlots.length > 0 ? (
-                    <View style={styles.timeGrid}>
-                      {availableSlots.map((time, index) => (
-                        <TouchableOpacity
-                          key={`time-${index}`}
-                          style={[
-                            styles.timeItem,
-                            selectedTime === time && styles.timeItemSelected,
-                          ]}
-                          onPress={() => {
-                            setSelectedTime(time);
-                            // 選擇時間後，滾動到確認按鈕
-                            setTimeout(() => {
-                              scrollToConfirmButton();
-                            }, 200);
-                          }}
-                        >
-                          <Text style={[
-                            styles.timeText,
-                            selectedTime === time && styles.timeTextSelected,
-                          ]}>
-                            {time}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  ) : (
-                    <View style={styles.noSlots}>
-                      <Ionicons name="calendar-outline" size={32} color={Colors.textLight} />
-                      <Text style={styles.noSlotsText}>此日期暫無可預約時段</Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* 選擇時間後，直接顯示確認資訊 */}
-                {selectedTime && (
-                  <View 
-                    ref={confirmButtonRef} 
-                    style={styles.confirmSectionInline}
-                    onLayout={(event) => {
-                      const { y } = event.nativeEvent.layout;
-                      setConfirmButtonY(y);
-                    }}
-                  >
-                    <Text style={styles.confirmTitleInline}>確認預約資訊</Text>
-                    <View style={styles.confirmRowInline}>
-                      <Text style={styles.confirmLabelInline}>課程</Text>
-                      <Text style={styles.confirmValueInline}>{selectedService.name}</Text>
-                    </View>
-                    <View style={styles.confirmRowInline}>
-                      <Text style={styles.confirmLabelInline}>日期</Text>
-                      <Text style={styles.confirmValueInline}>
-                        {format(selectedDate, 'yyyy年M月d日 EEEE', { locale: zhTW })}
-                      </Text>
-                    </View>
-                    <View style={styles.confirmRowInline}>
-                      <Text style={styles.confirmLabelInline}>時間</Text>
-                      <Text style={styles.confirmValueInline}>{selectedTime}</Text>
-                    </View>
-                    <View style={styles.confirmRowInline}>
-                      <Text style={styles.confirmLabelInline}>費用</Text>
-                      <Text style={styles.confirmValueInline}>
-                        NT${selectedService.price.toLocaleString()}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={[styles.button, styles.confirmButton, isLoading && styles.buttonDisabled]}
-                      onPress={handleSubmit}
-                      disabled={isLoading}
-                    >
-                      <Ionicons name="checkmark-circle" size={20} color={Colors.textOnPrimary} />
-                      <Text style={styles.buttonText}>
-                        {isLoading ? '預約中...' : '確認預約'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </>
-            )}
+            {/* 下一步：前往選日期與時間 */}
+            <TouchableOpacity
+              style={[
+                styles.button,
+                (!selectedService || isLoading) && styles.buttonDisabled,
+                { marginTop: 12 },
+              ]}
+              onPress={() => setStep('datetime')}
+              disabled={!selectedService || isLoading}
+            >
+              <Text style={styles.buttonText}>
+                {selectedService ? '下一步：選日期與時間' : '請先選擇課程'}
+              </Text>
+            </TouchableOpacity>
           </View>
         );
 
@@ -902,7 +709,6 @@ export default function BookingScreen() {
 
   return (
     <ScrollView 
-      ref={scrollViewRef}
       style={styles.container} 
       contentContainerStyle={styles.content}
     >
