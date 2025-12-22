@@ -43,10 +43,27 @@ export default async function handler(
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 取得今天的日期（預約前一天）
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    // 取得今天的日期（台灣時間 UTC+8）
+    // GitHub Actions 在 UTC 04:00 執行（台灣時間 12:00），需要確保使用台灣時區計算日期
+    const now = new Date();
+    // 使用 toLocaleString 取得台灣時間的日期字串，然後轉換為 YYYY-MM-DD 格式
+    const taiwanDateStr = now.toLocaleString('en-US', { 
+      timeZone: 'Asia/Taipei', 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit' 
+    });
+    // 轉換格式：MM/DD/YYYY -> YYYY-MM-DD
+    const [month, day, year] = taiwanDateStr.split('/');
+    const todayStr = `${year}-${month}-${day}`;
     const reminderTime = '12:00:00';
+
+    console.log('查詢提醒任務:', {
+      todayStr,
+      reminderTime,
+      serverTime: now.toISOString(),
+      taiwanDateStr
+    });
 
     // 查詢今天需要發送的提醒（預約前一天，且尚未發送）
     const { data: reminders, error: queryError } = await supabase
@@ -62,12 +79,16 @@ export default async function handler(
     }
 
     if (!reminders || reminders.length === 0) {
+      console.log('沒有找到需要發送的提醒任務');
       return res.status(200).json({ 
         success: true, 
         message: 'No reminders to send',
-        count: 0 
+        count: 0,
+        queryDate: todayStr
       });
     }
+
+    console.log(`找到 ${reminders.length} 個需要發送的提醒任務`);
 
     // 取得 LINE Access Token
     const channelAccessToken = process.env.LINE_ACCESS_TOKEN;
