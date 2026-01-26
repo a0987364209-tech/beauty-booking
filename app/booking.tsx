@@ -78,7 +78,7 @@ export default function BookingScreen() {
         const dateStr = format(date, 'yyyy-MM-dd');
         // 過濾掉休息日
         if (!dayOffs.has(dateStr)) {
-          dates.push(date);
+        dates.push(date);
         }
       }
     }
@@ -620,11 +620,11 @@ export default function BookingScreen() {
                     </Text>
                   </View>
                   {selectedService?.id === course.id && (
-                    <Ionicons 
-                      name="checkmark-circle" 
-                      size={28} 
-                      color={Colors.primary}
-                    />
+                      <Ionicons 
+                        name="checkmark-circle" 
+                        size={28} 
+                        color={Colors.primary}
+                      />
                   )}
                 </TouchableOpacity>
               ))}
@@ -632,18 +632,18 @@ export default function BookingScreen() {
 
             {/* 下一步按鈕 */}
             <View style={{ marginTop: 16 }}>
-              <TouchableOpacity
+                  <TouchableOpacity
                 style={[styles.button, !selectedService && styles.buttonDisabled]}
-                onPress={() => {
+                    onPress={() => {
                   if (selectedService) {
                     setStep('datetime');
-                  }
-                }}
+                      }
+                    }}
                 disabled={!selectedService}
               >
                 <Text style={styles.buttonText}>下一步</Text>
-              </TouchableOpacity>
-            </View>
+                  </TouchableOpacity>
+                </View>
 
           </View>
         );
@@ -832,29 +832,29 @@ export default function BookingScreen() {
 
       {/* 步驟指示 */}
       {step !== 'success' && (
-        <View style={styles.steps}>
-          {['驗證', '選課程', '選時間', '確認'].map((label, index) => {
-            const stepIndex = ['phone', 'service', 'datetime', 'confirm'].indexOf(step);
-            const isActive = index <= stepIndex;
-            
-            return (
-              <View key={label} style={styles.stepItem}>
-                <View style={[styles.stepDot, isActive && styles.stepDotActive]}>
-                  {index < stepIndex ? (
-                    <Ionicons name="checkmark" size={12} color={Colors.textOnPrimary} />
-                  ) : (
-                    <Text style={[styles.stepNumber, isActive && styles.stepNumberActive]}>
-                      {index + 1}
-                    </Text>
-                  )}
-                </View>
-                <Text style={[styles.stepLabel, isActive && styles.stepLabelActive]}>
-                  {label}
-                </Text>
+      <View style={styles.steps}>
+        {['驗證', '選課程', '選時間', '確認'].map((label, index) => {
+          const stepIndex = ['phone', 'service', 'datetime', 'confirm'].indexOf(step);
+          const isActive = index <= stepIndex;
+          
+          return (
+            <View key={label} style={styles.stepItem}>
+              <View style={[styles.stepDot, isActive && styles.stepDotActive]}>
+                {index < stepIndex ? (
+                  <Ionicons name="checkmark" size={12} color={Colors.textOnPrimary} />
+                ) : (
+                  <Text style={[styles.stepNumber, isActive && styles.stepNumberActive]}>
+                    {index + 1}
+                  </Text>
+                )}
               </View>
-            );
-          })}
-        </View>
+              <Text style={[styles.stepLabel, isActive && styles.stepLabelActive]}>
+                {label}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
       )}
 
       {renderStep()}
