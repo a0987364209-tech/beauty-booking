@@ -669,6 +669,76 @@ export default function BookingScreen() {
             
             {/* 日期選擇 - 使用 flexWrap 避免嵌套 ScrollView */}
             <Text style={styles.sectionLabel}>選擇日期</Text>
+            
+            {/* 月份選擇器 */}
+            <View style={styles.monthSelector}>
+              <TouchableOpacity
+                style={styles.monthNavButton}
+                onPress={() => {
+                  const prevMonth = addMonths(currentMonth, -1);
+                  const today = new Date();
+                  const currentMonthStart = startOfMonth(today);
+                  const prevMonthStart = startOfMonth(prevMonth);
+                  // 只能往前到當前月份
+                  if (prevMonthStart >= currentMonthStart) {
+                    setCurrentMonth(prevMonth);
+                    // 如果切換月份後，選中的日期不在新月份中，重置為該月份的第一個可用日期
+                    const newDates = getDatesForMonth(prevMonth);
+                    if (newDates.length > 0 && !newDates.some(d => isSameDay(d, selectedDate))) {
+                      setSelectedDate(newDates[0]);
+                      setSelectedTime(null);
+                    }
+                  }
+                }}
+                disabled={format(startOfMonth(currentMonth), 'yyyy-MM') <= format(startOfMonth(new Date()), 'yyyy-MM')}
+              >
+                <Ionicons 
+                  name="chevron-back" 
+                  size={20} 
+                  color={
+                    isSameDay(startOfMonth(currentMonth), startOfMonth(new Date()))
+                      ? Colors.textLight
+                      : Colors.text
+                  } 
+                />
+              </TouchableOpacity>
+              
+              <Text style={styles.monthLabel}>
+                {format(currentMonth, 'yyyy年M月', { locale: zhTW })}
+              </Text>
+              
+              <TouchableOpacity
+                style={styles.monthNavButton}
+                onPress={() => {
+                  const nextMonth = addMonths(currentMonth, 1);
+                  const sixMonthsLater = addMonths(new Date(), 6);
+                  const nextMonthStart = startOfMonth(nextMonth);
+                  const sixMonthsLaterStart = startOfMonth(sixMonthsLater);
+                  // 只能往後到 6 個月後
+                  if (nextMonthStart <= sixMonthsLaterStart) {
+                    setCurrentMonth(nextMonth);
+                    // 如果切換月份後，選中的日期不在新月份中，重置為該月份的第一個可用日期
+                    const newDates = getDatesForMonth(nextMonth);
+                    if (newDates.length > 0 && !newDates.some(d => isSameDay(d, selectedDate))) {
+                      setSelectedDate(newDates[0]);
+                      setSelectedTime(null);
+                    }
+                  }
+                }}
+                disabled={format(startOfMonth(currentMonth), 'yyyy-MM') >= format(startOfMonth(addMonths(new Date(), 6)), 'yyyy-MM')}
+              >
+                <Ionicons 
+                  name="chevron-forward" 
+                  size={20} 
+                  color={
+                    isSameDay(endOfMonth(currentMonth), endOfMonth(addMonths(new Date(), 6)))
+                      ? Colors.textLight
+                      : Colors.text
+                  } 
+                />
+              </TouchableOpacity>
+            </View>
+            
             <View style={styles.dateGrid}>
               {dates.map((date, index) => {
                 const isSelected = isSameDay(date, selectedDate);
@@ -1062,9 +1132,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
     marginBottom: 16,
     gap: 16,
+  },
+  monthNavButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: Colors.background,
+    minWidth: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   monthButton: {
     padding: 8,
