@@ -19,7 +19,7 @@ import {
 
 const BUSINESS_START = 9; // 營業開始時間
 const BUSINESS_END = 18; // 營業結束時間（18:00）
-const BUFFER_MINUTES = 30; // 緩衝時間
+const BUFFER_MINUTES = 30; // 課後緩衝：課程 A 工時 60 分 = 9:00~10:00，可預約時間為 10:30
 
 export default function BookingScreen() {
   const { phone: initialPhone } = useLocalSearchParams<{ phone?: string }>();
@@ -63,23 +63,18 @@ export default function BookingScreen() {
     }
   };
 
-  // 生成當前月份的所有日期（過濾掉休息日）
+  // 生成當前月份的所有日期（含休息日；休息日在行事曆打 x，booking 顯示「滿」）
   const getDatesForMonth = (month: Date) => {
     const start = startOfMonth(month);
-    const end = endOfMonth(month);
     const daysInMonth = getDaysInMonth(month);
     const today = new Date();
     const dates: Date[] = [];
     
-    // 只包含今天及之後的日期，且排除休息日
+    // 只包含今天及之後的日期，休息日也顯示（不排除）
     for (let i = 0; i < daysInMonth; i++) {
       const date = addDays(start, i);
       if (isSameDay(date, today) || isAfter(date, today)) {
-        const dateStr = format(date, 'yyyy-MM-dd');
-        // 過濾掉休息日
-        if (!dayOffs.has(dateStr)) {
         dates.push(date);
-        }
       }
     }
     
@@ -268,7 +263,7 @@ export default function BookingScreen() {
     if (!selectedService || !selectedDate) return;
 
     const serviceDuration = selectedService.duration_minutes || 60;
-    const totalDuration = serviceDuration + BUFFER_MINUTES; // 工時 + 緩衝時間
+    const totalDuration = serviceDuration; // 預約時段 = 工時（例：60 分 = 9:00~10:00）
     const slots: string[] = [];
     
     let currentTime = setMinutes(setHours(selectedDate, BUSINESS_START), 0);
@@ -291,29 +286,20 @@ export default function BookingScreen() {
         continue;
       }
 
-      // 檢查是否與現有預約衝突
-      // 需要考慮每個預約的工時+緩衝時間
-      // 已取消的預約不佔用時段，可以重新預約
+      // 檢查是否與現有預約衝突：工時 + 課後 30 分緩衝
+      // 課程 A 工時 60 分 = 9:00~10:00，可預約時間為 10:30（10:00+30 分）
+      // 既有預約佔用區間 = [aptStart, aptEnd + 30 分]
       const hasConflict = (existingAppointments as any).some((apt: any) => {
-        // 已取消的預約不佔用時段
-        if (apt.status === 'cancelled') {
-          return false;
-        }
+        if (apt.status === 'cancelled') return false;
         
         const aptService = apt.service as any;
-        const aptServiceDuration = aptService?.duration_minutes || 60;
-        const aptTotalDuration = aptServiceDuration + BUFFER_MINUTES;
-        
+        const aptDuration = aptService?.duration_minutes || 60;
         const aptStart = new Date(`${apt.appointment_date}T${apt.start_time}`);
-        const aptEnd = addMinutes(aptStart, aptTotalDuration);
+        const aptEnd = addMinutes(aptStart, aptDuration);
+        const aptBlockedEnd = addMinutes(aptEnd, BUFFER_MINUTES); // 結束後 +30 分才可預約
         
-        // 檢查時間重疊：新預約的開始或結束時間在現有預約的時間範圍內，或反之
-        return (
-          (isAfter(currentTime, aptStart) && isBefore(currentTime, aptEnd)) ||
-          (isAfter(slotEnd, aptStart) && isBefore(slotEnd, aptEnd)) ||
-          (isBefore(currentTime, aptStart) && isAfter(slotEnd, aptEnd)) ||
-          format(currentTime, 'HH:mm') === apt.start_time
-        );
+        // 與佔用區間 [aptStart, aptBlockedEnd] 有重疊即衝突
+        return currentTime < aptBlockedEnd && slotEnd > aptStart;
       });
 
       if (!hasConflict) {
@@ -338,7 +324,7 @@ export default function BookingScreen() {
     
     try {
       const serviceDuration = selectedService.duration_minutes || 60;
-      const totalDuration = serviceDuration + BUFFER_MINUTES;
+      const totalDuration = serviceDuration; // 工時已包含緩衝時間
       const startTime = selectedTime;
       const [hours, minutes] = startTime.split(':').map(Number);
       const appointmentDateTime = setMinutes(setHours(selectedDate, hours), minutes);
@@ -358,22 +344,14 @@ export default function BookingScreen() {
         throw new Error('檢查預約衝突失敗，請稍後再試');
       }
 
-      // 檢查是否與現有預約衝突
+      // 檢查是否與現有預約衝突：工時 + 課後 30 分緩衝（可預約時間 = 結束 + 30 分）
       const hasConflict = (conflictingAppointments || []).some((apt: any) => {
         const aptService = apt.service as any;
-        const aptServiceDuration = aptService?.duration_minutes || 60;
-        const aptTotalDuration = aptServiceDuration + BUFFER_MINUTES;
-        
+        const aptDuration = aptService?.duration_minutes || 60;
         const aptStart = new Date(`${apt.appointment_date}T${apt.start_time}`);
-        const aptEnd = addMinutes(aptStart, aptTotalDuration);
-        
-        // 檢查時間重疊
-        return (
-          (isAfter(appointmentDateTime, aptStart) && isBefore(appointmentDateTime, aptEnd)) ||
-          (isAfter(endDateTime, aptStart) && isBefore(endDateTime, aptEnd)) ||
-          (isBefore(appointmentDateTime, aptStart) && isAfter(endDateTime, aptEnd)) ||
-          format(appointmentDateTime, 'HH:mm') === apt.start_time
-        );
+        const aptEnd = addMinutes(aptStart, aptDuration);
+        const aptBlockedEnd = addMinutes(aptEnd, BUFFER_MINUTES);
+        return appointmentDateTime < aptBlockedEnd && endDateTime > aptStart;
       });
 
       if (hasConflict) {
@@ -741,8 +719,27 @@ export default function BookingScreen() {
             
             <View style={styles.dateGrid}>
               {dates.map((date, index) => {
+                const dateStr = format(date, 'yyyy-MM-dd');
+                const isDayOff = dayOffs.has(dateStr); // 行事曆打 x 的休息日
                 const isSelected = isSameDay(date, selectedDate);
                 const isToday = isSameDay(date, new Date());
+                
+                if (isDayOff) {
+                  return (
+                    <View
+                      key={`date-${index}`}
+                      style={[styles.dateItem, styles.dateItemDisabled]}
+                    >
+                      <Text style={styles.dateWeekday}>
+                        {isToday ? '今天' : format(date, 'EEE', { locale: zhTW })}
+                      </Text>
+                      <Text style={styles.dateDay}>
+                        {format(date, 'd')}
+                      </Text>
+                      <Text style={styles.dateFullLabel}>滿</Text>
+                    </View>
+                  );
+                }
                 
                 return (
                   <TouchableOpacity
@@ -1272,6 +1269,16 @@ const styles = StyleSheet.create({
   },
   dateTextSelected: {
     color: Colors.textOnPrimary,
+  },
+  dateItemDisabled: {
+    backgroundColor: Colors.borderLight,
+    opacity: 0.9,
+  },
+  dateFullLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#c62828',
+    marginTop: 4,
   },
   timeGrid: {
     flexDirection: 'row',
