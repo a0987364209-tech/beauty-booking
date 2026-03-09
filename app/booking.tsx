@@ -38,7 +38,7 @@ export default function BookingScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [lineUserId, setLineUserId] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
-  const [dayOffs, setDayOffs] = useState<Set<string>>(new Set()); // 休息日集合
+  const [dayOffReasons, setDayOffReasons] = useState<Record<string, 'full' | 'closed'>>({}); // 額滿=預約額滿、公休=公休
   
   // 用於滾動的 ref
   const scrollViewRef = useRef<ScrollView>(null);
@@ -133,7 +133,7 @@ export default function BookingScreen() {
     loadCourses();
   }, []);
 
-  // 載入休息日（載入未來6個月的休息日）
+  // 載入休息日（額滿/公休，未來6個月）
   useEffect(() => {
     const loadDayOffs = async () => {
       try {
@@ -143,7 +143,7 @@ export default function BookingScreen() {
 
         const { data, error } = await supabase
           .from('day_off')
-          .select('date')
+          .select('date, type')
           .gte('date', today)
           .lte('date', sixMonthsLaterStr);
 
@@ -152,15 +152,14 @@ export default function BookingScreen() {
           return;
         }
 
-        // 將休息日轉換為 Set 方便查詢
-        const dayOffSet = new Set<string>();
+        const reasons: Record<string, 'full' | 'closed'> = {};
         if (data) {
           data.forEach((item: any) => {
-            dayOffSet.add(item.date);
+            const t = item?.type?.toString?.()?.toLowerCase?.();
+            reasons[item.date] = t === 'closed' || t === 'close' ? 'closed' : 'full';
           });
         }
-
-        setDayOffs(dayOffSet);
+        setDayOffReasons(reasons);
       } catch (error) {
         console.error('載入休息日錯誤:', error);
       }
@@ -261,6 +260,11 @@ export default function BookingScreen() {
   // 生成可用時段
   useEffect(() => {
     if (!selectedService || !selectedDate) return;
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    if (dayOffReasons[dateStr] != null) {
+      setAvailableSlots([]);
+      return;
+    }
 
     const serviceDuration = selectedService.duration_minutes || 60;
     const totalDuration = serviceDuration; // 預約時段 = 工時（例：60 分 = 9:00~10:00）
@@ -313,7 +317,7 @@ export default function BookingScreen() {
     }
 
     setAvailableSlots(slots);
-  }, [selectedDate, selectedService, existingAppointments]);
+  }, [selectedDate, selectedService, existingAppointments, dayOffReasons]);
 
   // 提交預約
   const handleSubmit = async () => {
@@ -720,7 +724,8 @@ export default function BookingScreen() {
             <View style={styles.dateGrid}>
               {dates.map((date, index) => {
                 const dateStr = format(date, 'yyyy-MM-dd');
-                const isDayOff = dayOffs.has(dateStr); // 行事曆打 x 的休息日
+                const dayOffType = dayOffReasons[dateStr]; // 'full'=滿, 'closed'=公休
+                const isDayOff = dayOffType != null;
                 const isSelected = isSameDay(date, selectedDate);
                 const isToday = isSameDay(date, new Date());
                 
@@ -736,7 +741,9 @@ export default function BookingScreen() {
                       <Text style={styles.dateDay}>
                         {format(date, 'd')}
                       </Text>
-                      <Text style={styles.dateFullLabel}>滿</Text>
+                      <Text style={styles.dateFullLabel}>
+                        {dayOffType === 'closed' ? '公休' : '滿'}
+                      </Text>
                     </View>
                   );
                 }
