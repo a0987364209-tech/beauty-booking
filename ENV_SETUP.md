@@ -23,6 +23,9 @@ LINE_ACCESS_TOKEN=your_channel_access_token
 LINE_SHOP_USER_ID=Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # 多位接收者（逗號分隔）
 LINE_SHOP_USER_IDS=Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,Uyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+
+# iPhone 訂閱店家行事曆（ICS）保護 token
+SHOP_CALENDAR_TOKEN=your_random_long_token
 ```
 
 ---
@@ -67,6 +70,12 @@ LINE_SHOP_USER_IDS=Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,Uyyyyyyyyyyyyyyyyyyyyyyyyyy
 2. 讓管理者在 LINE 內開一次 LIFF 頁面並登入（可從 booking 網頁進入）
 3. 由系統記錄/顯示該管理者的 `userId`（格式通常是 `U` 開頭）
 4. 將此 ID 填到 `LINE_SHOP_USER_ID`（多人用 `LINE_SHOP_USER_IDS`）
+
+### 5. 行事曆訂閱 Token（iPhone 顯示用）
+1. 自行產生一段隨機長字串（至少 32 碼）
+2. 設為 `SHOP_CALENDAR_TOKEN`
+3. 用以下網址訂閱（將網域與 token 換成你的）
+   - `webcal://beauty-booking-gamma.vercel.app/api/shop-calendar.ics?token=YOUR_TOKEN`
 
 ---
 
