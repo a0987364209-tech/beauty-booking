@@ -17,6 +17,12 @@ EXPO_PUBLIC_LIFF_APP_ID=your_liff_app_id
 LINE_CHANNEL_ID=your_channel_id
 LINE_CHANNEL_SECRET=your_channel_secret
 LINE_ACCESS_TOKEN=your_channel_access_token
+
+# 店家通知接收者（至少設一個，才能收到「新預約通知」）
+# 單一接收者
+LINE_SHOP_USER_ID=Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# 多位接收者（逗號分隔）
+LINE_SHOP_USER_IDS=Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,Uyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
 ```
 
 ---
@@ -55,6 +61,12 @@ LINE_ACCESS_TOKEN=your_channel_access_token
 2. 在 "Channel access token" 區塊
 3. 點擊 "Issue" 按鈕
 4. 複製產生的 **Access token**
+
+### 4. 店家 LINE User ID（接收新預約通知）
+1. 讓店家管理者加入同一個 LINE 官方帳號（好友）
+2. 讓管理者在 LINE 內開一次 LIFF 頁面並登入（可從 booking 網頁進入）
+3. 由系統記錄/顯示該管理者的 `userId`（格式通常是 `U` 開頭）
+4. 將此 ID 填到 `LINE_SHOP_USER_ID`（多人用 `LINE_SHOP_USER_IDS`）
 
 ---
 

@@ -148,7 +148,8 @@ class LineLiffService {
     appointmentDate: string,
     appointmentTime: string,
     serviceName: string,
-    customerName?: string
+    customerName?: string,
+    customerPhone?: string
   ): Promise<boolean> {
     try {
       const response = await fetch('/api/send-line-notification', {
@@ -163,6 +164,7 @@ class LineLiffService {
           appointmentTime,
           serviceName,
           customerName,
+          customerPhone,
         }),
       });
 

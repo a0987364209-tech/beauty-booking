@@ -396,7 +396,8 @@ export default function BookingScreen() {
             format(selectedDate, 'yyyy-MM-dd'),
             startTime,
             selectedService.name,
-            customer?.name || undefined
+            customer?.name || undefined,
+            customer?.phone || undefined
           );
 
           // 2. 建立提醒任務（預約前一天中午 12:00 發送）
