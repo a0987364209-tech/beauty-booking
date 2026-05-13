@@ -39,6 +39,8 @@ export default function BookingScreen() {
   const [lineUserId, setLineUserId] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [dayOffReasons, setDayOffReasons] = useState<Record<string, 'full' | 'closed'>>({}); // 額滿=預約額滿、公休=公休
+  /** 分時段阻擋：某日被封鎖的可選起點 HH:mm（與店內行事曆一致） */
+  const [timeSlotBlockStarts, setTimeSlotBlockStarts] = useState<Record<string, string[]>>({});
   
   // 用於滾動的 ref
   const scrollViewRef = useRef<ScrollView>(null);
@@ -165,6 +167,50 @@ export default function BookingScreen() {
       }
     };
     loadDayOffs();
+  }, []);
+
+  useEffect(() => {
+    const loadTimeSlotBlocks = async () => {
+      try {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const sixMonthsLater = addMonths(new Date(), 6);
+        const sixMonthsLaterStr = format(endOfMonth(sixMonthsLater), 'yyyy-MM-dd');
+
+        const { data, error } = await supabase
+          .from('time_slot_blocks')
+          .select('block_date, slot_time')
+          .gte('block_date', today)
+          .lte('block_date', sixMonthsLaterStr);
+
+        if (error) {
+          if ((error as any).code === 'PGRST205') {
+            console.warn(
+              '[time_slot_blocks] 資料表不存在，分時段阻擋略過。請在 Supabase SQL Editor 執行 Beauty-app/database/create_time_slot_blocks.sql'
+            );
+            setTimeSlotBlockStarts({});
+            return;
+          }
+          console.error('載入分時段阻擋失敗:', error);
+          return;
+        }
+
+        const map: Record<string, string[]> = {};
+        (data || []).forEach((row: any) => {
+          const raw = row.block_date as string;
+          const d =
+            typeof raw === 'string'
+              ? raw.slice(0, 10)
+              : format(new Date(raw as string | number | Date), 'yyyy-MM-dd');
+          if (!map[d]) map[d] = [];
+          map[d].push(row.slot_time as string);
+        });
+        Object.keys(map).forEach((d) => map[d].sort());
+        setTimeSlotBlockStarts(map);
+      } catch (e) {
+        console.error('載入分時段阻擋錯誤:', e);
+      }
+    };
+    loadTimeSlotBlocks();
   }, []);
 
   // 如果有初始手機號碼，自動驗證
@@ -306,7 +352,10 @@ export default function BookingScreen() {
         return currentTime < aptBlockedEnd && slotEnd > aptStart;
       });
 
-      if (!hasConflict) {
+      const blockedStarts = timeSlotBlockStarts[dateStr] || [];
+      const startIsBlocked = blockedStarts.includes(timeStr);
+
+      if (!hasConflict && !startIsBlocked) {
         slots.push(timeStr);
       }
 
@@ -317,7 +366,7 @@ export default function BookingScreen() {
     }
 
     setAvailableSlots(slots);
-  }, [selectedDate, selectedService, existingAppointments, dayOffReasons]);
+  }, [selectedDate, selectedService, existingAppointments, dayOffReasons, timeSlotBlockStarts]);
 
   // 提交預約
   const handleSubmit = async () => {
@@ -362,6 +411,23 @@ export default function BookingScreen() {
         setErrorMessage('此時段已被預約，請選擇其他時段');
         setIsLoading(false);
         // 重新載入可用時段
+        await loadAppointments(selectedDate);
+        return;
+      }
+
+      const { data: blockedRow, error: blockErr } = await supabase
+        .from('time_slot_blocks')
+        .select('id')
+        .eq('block_date', appointmentDateStr)
+        .eq('slot_time', startTime)
+        .maybeSingle();
+
+      if (blockErr) {
+        console.error('檢查阻擋時段錯誤:', blockErr);
+      }
+      if (blockedRow) {
+        setErrorMessage('此時段已關閉預約，請選擇其他時段');
+        setIsLoading(false);
         await loadAppointments(selectedDate);
         return;
       }
